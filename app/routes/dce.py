@@ -11,44 +11,18 @@ from app.utils import analytics as A
 
 dce_bp = Blueprint("dce", __name__, url_prefix="/dce")
 
-
 # --------------------------------------------------------------------------
-# Activity cards shown on the DCE Dashboard. Each maps to the dedicated
-# history report page that already ships with full filtering (station,
-# shift, engineer, aircraft, status, custom date range) and export/sort.
-# "endpoint"/"report_key" drive the link; "types" drive the 24h stat card.
+# Query-string keys carried forward from the Overview filter bar onto every
+# clickable stat/number so the Activities list it opens reflects the same
+# period/station/shift/aircraft/airline scope the DCE was already looking
+# at. "engineer_id" is deliberately excluded -- the Engineer Summary rows
+# set it explicitly per engineer.
 # --------------------------------------------------------------------------
-DASHBOARD_ACTIVITY_CARDS = [
-    {"key": "maintenance_check", "label": "Maintenance Check", "icon": "bi-clipboard2-check",
-     "types": (A.ActivityType.MAINTENANCE_CHECK,), "endpoint": "dce.other_report_view", "report_key": "maintenance_check"},
-    {"key": "mic", "label": "MIC / Scheduled Maintenance", "icon": "bi-clipboard2-pulse",
-     "types": A.MIC_TYPES, "endpoint": "dce.other_report_view", "report_key": "mic"},
-    {"key": "quality_ri", "label": "QARI", "icon": "bi-patch-check",
-     "types": A.QUALITY_TYPES, "endpoint": "dce.other_report_view", "report_key": "quality_ri"},
-    {"key": "tsr", "label": "TSR", "icon": "bi-exclamation-triangle",
-     "types": A.TSR_TYPES, "endpoint": "dce.other_report_view", "report_key": "tsr"},
-    {"key": "pirep_unscheduled_maintenance", "label": "PIREP / Unscheduled Maintenance", "icon": "bi-wrench-adjustable",
-     "types": A.DEFECT_TYPES, "endpoint": "dce.other_report_view", "report_key": "pirep_unscheduled_maintenance"},
-    {"key": "replacement", "label": "Replacement", "icon": "bi-arrow-repeat",
-     "types": (A.ActivityType.REPLACEMENT,), "endpoint": "dce.other_report_view", "report_key": "replacement"},
-    {"key": "cf_removal", "label": "CF Removal", "icon": "bi-dash-circle",
-     "types": (A.ActivityType.CF_REMOVAL,), "endpoint": "dce.other_report_view", "report_key": "cf_removal"},
-    {"key": "cf", "label": "CF", "icon": "bi-arrow-repeat",
-     "types": (A.ActivityType.CF,), "endpoint": "dce.other_report_view", "report_key": "cf"},
-]
+CARRY_FILTER_KEYS = ("period", "date_from", "date_to", "station_id", "shift_name", "aircraft_id", "airline_id")
 
 
-def dashboard_activity_cards(station_id=None):
-    """Builds the DCE Dashboard activity-card list with live last-24h stats."""
-    cards = []
-    for cfg in DASHBOARD_ACTIVITY_CARDS:
-        stats = A.last_24h_card_stats(cfg["types"], station_id=station_id)
-        if cfg["report_key"]:
-            url = url_for(cfg["endpoint"], report_key=cfg["report_key"])
-        else:
-            url = url_for(cfg["endpoint"])
-        cards.append({**cfg, "stats": stats, "url": url})
-    return cards
+def _carry_filters():
+    return {k: v for k, v in request.args.items() if k in CARRY_FILTER_KEYS}
 
 
 def _filters():
@@ -64,14 +38,61 @@ def _base_ctx(active_filters):
 
 
 # --------------------------------------------------------------------------
-# Dashboard
+# Overview -- the DCE landing page. Combines the headline KPI tiles, charts
+# and Engineer Summary that used to live on a separate "Dashboard" page.
+# Every KPI tile/number below is a link into Activities (other_report_view)
+# pre-filtered to exactly the records that make up that number.
 # --------------------------------------------------------------------------
-@dce_bp.route("/dashboard")
+# key: matches a app.utils.analytics.compute_kpis() field.
+# report_key/extra: how to reach the matching Activities list.
+OVERVIEW_STAT_CARDS = [
+    {"key": "pending_approvals", "label": "Pending Approvals", "icon": "bi-hourglass-split",
+     "report_key": "daily_activity", "extra": {"status": "pending_approval"}},
+    {"key": "aircraft_inspected", "label": "Aircraft Inspected", "icon": "bi-airplane",
+     "report_key": "inspections", "extra": {"status": "approved"}},
+    {"key": "pia_inspections", "label": "PIA Inspections", "icon": "bi-building",
+     "report_key": "inspections", "extra": {"status": "approved", "category": "pia"}},
+    {"key": "third_party_inspections", "label": "Third-Party Inspections", "icon": "bi-globe",
+     "report_key": "inspections", "extra": {"status": "approved", "category": "third_party"}},
+    {"key": "maintenance_check", "label": "Maintenance Check", "icon": "bi-clipboard2-check",
+     "report_key": "maintenance_check", "extra": {"status": "approved"}},
+    {"key": "tsr", "label": "TSR", "icon": "bi-exclamation-triangle",
+     "report_key": "tsr", "extra": {"status": "approved"}},
+    {"key": "mic", "label": "MIC / Scheduled Maintenance", "icon": "bi-clipboard2-pulse",
+     "report_key": "mic", "extra": {"status": "approved"}},
+    {"key": "replacement", "label": "Replacement", "icon": "bi-arrow-repeat",
+     "report_key": "replacement", "extra": {"status": "approved"}},
+    {"key": "qari", "label": "QARI", "icon": "bi-patch-check",
+     "report_key": "quality_ri", "extra": {"status": "approved"}},
+    {"key": "cf_removal", "label": "CF Removal", "icon": "bi-dash-circle",
+     "report_key": "cf_removal", "extra": {"status": "approved"}},
+    {"key": "cf", "label": "CF", "icon": "bi-arrow-repeat",
+     "report_key": "cf", "extra": {"status": "approved"}},
+    {"key": "pirep_unscheduled", "label": "PIREP / Unscheduled Maintenance", "icon": "bi-wrench-adjustable",
+     "report_key": "pirep_unscheduled_maintenance", "extra": {"status": "approved"}},
+]
+
+
+@dce_bp.route("/overview")
 @login_required
 @roles_required(UserRole.DCE, UserRole.SUPER_ADMIN)
-def dashboard():
+def overview_menu():
     filters = _filters()
+    carry = _carry_filters()
     kpis = A.compute_kpis(filters)
+
+    stat_cards = [
+        {**cfg, "value": kpis[cfg["key"]],
+         "url": url_for("dce.other_report_view", report_key=cfg["report_key"], **carry, **cfg["extra"])}
+        for cfg in OVERVIEW_STAT_CARDS
+    ]
+
+    engineer_rows = [
+        {"engineer": row["engineer"], "activities": row["activities"],
+         "url": url_for("dce.other_report_view", report_key="daily_activity",
+                         engineer_id=row["engineer"].id, **carry)}
+        for row in A.engineer_performance(filters)
+    ]
 
     charts = {
         "daily_trend": A.daily_trend(filters),
@@ -87,40 +108,28 @@ def dashboard():
         "quality_ri_trend": A.quality_ri_trend(filters),
     }
 
-    ctx = _base_ctx(filters)
-    ctx.update(kpis=kpis, charts=charts)
-    return render_template("dce/dashboard.html", **ctx)
-
-
-# --------------------------------------------------------------------------
-# Navigation hub pages (Overview / Activities / Reports)
-# --------------------------------------------------------------------------
-# These pages introduce NO new data or business logic - they are pure
-# navigation menus that link out to the exact same routes that already
-# existed in the sidebar. Grouping them here lets the DCE sidebar stay
-# short (Dashboard / Overview / Activities / Reports / Settings) while
-# every existing report/activity/summary page remains fully reachable.
-@dce_bp.route("/overview")
-@login_required
-@roles_required(UserRole.DCE, UserRole.SUPER_ADMIN)
-def overview_menu():
     cards = [
         {"label": "Daily Summary", "desc": "Today's activity at a glance.",
-         "icon": "bi-calendar-day", "url": url_for("dce.dashboard", period="daily")},
+         "icon": "bi-calendar-day", "url": url_for("dce.overview_menu", period="daily")},
         {"label": "Weekly Summary", "desc": "Rolled-up view for the current week.",
-         "icon": "bi-calendar-week", "url": url_for("dce.dashboard", period="weekly")},
+         "icon": "bi-calendar-week", "url": url_for("dce.overview_menu", period="weekly")},
         {"label": "Monthly Summary", "desc": "Trends across the current month.",
-         "icon": "bi-calendar-month", "url": url_for("dce.dashboard", period="monthly")},
+         "icon": "bi-calendar-month", "url": url_for("dce.overview_menu", period="monthly")},
         {"label": "Shift Summary", "desc": "Performance broken down by shift.",
          "icon": "bi-clock-history", "url": url_for("dce.shifts_report")},
         {"label": "Station Summary", "desc": "Activity totals by station.",
          "icon": "bi-geo-alt", "url": url_for("dce.stations_report")},
+        {"label": "Engineer Summary", "desc": "Activity totals by engineer.",
+         "icon": "bi-person-badge", "url": url_for("dce.engineers_report")},
         {"label": "Aircraft Summary", "desc": "Activity totals by aircraft.",
          "icon": "bi-airplane", "url": url_for("dce.aircraft_report_view")},
-        {"label": "Activity Summary", "desc": "Full log of approved activity.",
+        {"label": "Activity Summary", "desc": "Full log of activity.",
          "icon": "bi-file-earmark-bar-graph", "url": url_for("dce.other_report_view", report_key="daily_activity")},
     ]
-    return render_template("dce/overview_menu.html", cards=cards)
+
+    ctx = _base_ctx(filters)
+    ctx.update(stat_cards=stat_cards, engineer_rows=engineer_rows, charts=charts, cards=cards)
+    return render_template("dce/overview_menu.html", **ctx)
 
 
 @dce_bp.route("/activities")

@@ -15,45 +15,7 @@
   <p class="text-muted mb-0">{{ current_user.role | role_label }}{% if current_user_station %} &middot; {{ current_user_station.name }}{% endif %}</p>
 </div>
 
-{% if current_user.is_dce %}
-<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-  <div>
-    <h5 class="mb-1"><i class="bi bi-grid-3x3-gap me-2"></i>Engineering Activities</h5>
-    <p class="text-muted small mb-0">Last 24 hours across {{ 'all stations' if not stats.selected_station_id else 'the selected station' }}. Click a card to view its full history.</p>
-  </div>
-  <form method="get" class="d-flex align-items-center gap-2">
-    <label class="form-label small mb-0">Station</label>
-    <select name="station_id" class="form-select form-select-sm" data-auto-submit>
-      <option value="">All Stations</option>
-      {% for s in stats.stations %}
-      <option value="{{ s.id }}" {{ 'selected' if stats.selected_station_id == s.id }}>{{ s.code }} &mdash; {{ s.name }}</option>
-      {% endfor %}
-    </select>
-  </form>
-</div>
-
-<div class="row g-3 mb-4">
-  {% for card in activity_cards %}
-  <div class="col-6 col-md-4 col-xl-3">
-    <a href="{{ card.url }}{{ '?station_id=' ~ stats.selected_station_id if stats.selected_station_id }}" class="text-decoration-none text-reset">
-      <div class="stat-card activity-card h-100">
-        <i class="bi {{ card.icon }} stat-icon"></i>
-        <div class="stat-value">{{ card.stats.total }}</div>
-        <div class="stat-label mb-2">{{ card.label }}</div>
-        <div class="small text-muted d-flex flex-wrap gap-2 justify-content-center">
-          <span><i class="bi bi-check-circle"></i> {{ card.stats.approved }}</span>
-          <span><i class="bi bi-hourglass-split"></i> {{ card.stats.pending }}</span>
-          <span><i class="bi bi-geo-alt"></i> {{ card.stats.stations }}</span>
-          <span><i class="bi bi-clock-history"></i> {{ card.stats.shifts }}</span>
-          {% if card.stats.aircraft %}<span><i class="bi bi-airplane"></i> {{ card.stats.aircraft }}</span>{% endif %}
-          {% if card.stats.flights %}<span><i class="bi bi-airplane-engines"></i> {{ card.stats.flights }}</span>{% endif %}
-        </div>
-      </div>
-    </a>
-  </div>
-  {% endfor %}
-</div>
-{% elif current_user.is_engineer and engineer_stats %}
+{% if current_user.is_engineer and engineer_stats %}
 <div class="row g-3 mb-4">
   <div class="col-sm-6 col-xl-3">
     <div class="stat-card">
@@ -184,7 +146,7 @@
 {% if current_user.is_super_admin and analytics %}
 <div class="d-flex justify-content-between align-items-center mb-2">
   <h5 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>Analytics Overview</h5>
-  <a href="{{ url_for('dce.dashboard') }}" class="btn btn-outline-pia btn-sm"><i class="bi bi-arrow-up-right me-1"></i>Full Analytics &amp; Reports</a>
+  <a href="{{ url_for('dce.overview_menu') }}" class="btn btn-outline-pia btn-sm"><i class="bi bi-arrow-up-right me-1"></i>Full Analytics &amp; Reports</a>
 </div>
 <div class="row g-3 mb-2">
   <div class="col-6 col-md-3 col-xl-2">
