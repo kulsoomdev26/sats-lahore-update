@@ -2,7 +2,7 @@ import traceback
 from datetime import date
 from types import SimpleNamespace
 
-from flask import Blueprint, render_template, request, current_app
+from flask import Blueprint, render_template, request, current_app, redirect, url_for
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 
@@ -37,6 +37,12 @@ def _log_and_rollback(context_label):
 @dashboard_bp.route("/dashboard")
 @login_required
 def index():
+    # DCE has no separate "Dashboard" -- the Navbar/sidebar Overview page
+    # (dce.overview_menu) is the DCE landing page, so send them straight
+    # there instead of rendering the generic dashboard below.
+    if current_user.role == UserRole.DCE:
+        return redirect(url_for("dce.overview_menu"))
+
     dashboard_error = None
 
     # Always start this request's queries against a clean transaction.
@@ -89,37 +95,6 @@ def index():
         # a 500 with a full traceback in the logs, rather than silently
         # rendering a broken page.
         raise
-
-    activity_cards = None
-
-    if current_user.role == UserRole.DCE:
-        # DCE Dashboard: activity cards (with rolling last-24h analytics)
-        # replace the generic org-wide counters. DCE sees every station by
-        # default, with an optional station filter (?station_id=...).
-        #
-        # This is wrapped defensively: on PostgreSQL, a DB-level error
-        # (e.g. a query referencing an enum value the production schema
-        # doesn't have yet) aborts the whole transaction, which would
-        # otherwise take down the rest of this page with it. We roll back
-        # and let the dashboard render without the cards rather than 500.
-        from app.routes.dce import dashboard_activity_cards
-        station_id = request.args.get("station_id", type=int)
-        try:
-            activity_cards = dashboard_activity_cards(station_id=station_id)
-        except Exception:
-            _log_and_rollback("DCE activity cards")
-            dashboard_error = "Activity cards are temporarily unavailable."
-            activity_cards = []
-
-        stations = Station.query.filter_by(is_active=True).order_by(Station.name).all()
-        # Snapshot to plain values immediately -- this list is rendered by
-        # dashboard.html and must survive any later db.session.rollback()
-        # (e.g. in the Super Admin analytics block below) without Jinja
-        # triggering a lazy re-SELECT per station.
-        stats["stations"] = [
-            SimpleNamespace(id=s.id, code=s.code, name=s.name) for s in stations
-        ]
-        stats["selected_station_id"] = station_id
 
     engineer_stats = None
     engineer_recent = []
@@ -292,7 +267,7 @@ def index():
     try:
         return render_template(
             "dashboard.html", stats=stats, recent_logs=recent_logs, analytics=analytics_data,
-            activity_cards=activity_cards, dashboard_error=dashboard_error,
+            dashboard_error=dashboard_error,
             current_user_station=current_user_station,
             engineer_stats=engineer_stats, engineer_recent=engineer_recent,
             si_stats=si_stats, si_recent=si_recent,

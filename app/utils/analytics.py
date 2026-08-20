@@ -80,6 +80,7 @@ def parse_filters(args):
         "airline_id": _int_or_none(args.get("airline_id")),
         "activity_type": args.get("activity_type") or None,
         "status": args.get("status") or None,  # approved/pending_approval/rejected
+        "category": args.get("category") or None,  # pia/third_party (Aircraft.category)
     }
 
 
@@ -109,6 +110,14 @@ def apply_filters(query, filters, *, force_approved=False):
     if filters.get("airline_id"):
         ac_ids = [aid for (aid,) in db.session.query(Aircraft.id).filter(Aircraft.airline_id == filters["airline_id"]).all()]
         query = query.filter(Activity.aircraft_id.in_(ac_ids) if ac_ids else Activity.id == -1)
+
+    if filters.get("category"):
+        try:
+            cat = AircraftCategory(filters["category"])
+            ac_ids = [aid for (aid,) in db.session.query(Aircraft.id).filter(Aircraft.category == cat).all()]
+            query = query.filter(Activity.aircraft_id.in_(ac_ids) if ac_ids else Activity.id == -1)
+        except ValueError:
+            pass
 
     if filters.get("activity_type"):
         try:
@@ -261,7 +270,6 @@ def compute_kpis(filters):
     ).count()
 
     kpis = {
-        "approved_activities": approved_q.count(),
         "pending_approvals": pending_q.count(),
         "aircraft_inspected": aircraft_inspected,
         "pia_inspections": pia_inspections,
@@ -550,6 +558,11 @@ def maintenance_report(filters, sort="date_desc"):
 OTHER_REPORT_TYPES = {
     "daily_activity": {"label": "Daily Activity", "types": None},
     "monthly_activity": {"label": "Monthly Activity", "types": None},
+    "inspections": {"label": "Aircraft Inspection", "types": INSPECTION_TYPES},
+    # "aircraft_inspected" mirrors compute_kpis()'s aircraft_inspected KPI:
+    # any activity type, as long as an aircraft is attached -- NOT limited
+    # to INSPECTION_TYPES like the "inspections" key above.
+    "aircraft_inspected": {"label": "Aircraft Inspected", "types": None, "require_aircraft": True},
     "maintenance_check": {"label": "Maintenance Check", "types": (ActivityType.MAINTENANCE_CHECK,)},
     "tsr": {"label": "TSR", "types": TSR_TYPES},
     "mic": {"label": "MIC / Scheduled Maintenance", "types": MIC_TYPES},
@@ -568,5 +581,7 @@ def other_report(report_key, filters, sort="date_desc"):
     q = apply_filters(base_query(), {**filters, "status": filters.get("status")}, force_approved=False)
     if cfg["types"]:
         q = q.filter(Activity.activity_type.in_(cfg["types"]))
+    if cfg.get("require_aircraft"):
+        q = q.filter(Activity.aircraft_id.isnot(None))
     rows = apply_sort(q, sort).limit(1000).all()
     return rows, cfg

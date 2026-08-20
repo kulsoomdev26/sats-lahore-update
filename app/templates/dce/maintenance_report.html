@@ -18,6 +18,7 @@
           <tr>
             <th>Aircraft</th><th>Type</th><th>Engineer</th><th>Shift</th><th>Station</th>
             <th>Date</th><th>Status</th><th>TSR</th><th>MIC</th><th>RI</th><th>Remarks</th>
+            <th class="text-end no-print">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -34,6 +35,9 @@
             <td>{{ a.mic_number or '-' }}</td>
             <td>{{ a.quality_status | enum_label if a.quality_status else '-' }}</td>
             <td class="small">{{ a.remarks or '-' }}</td>
+            <td class="text-end no-print">
+              <a href="{{ url_for('engineer.view_activity', activity_id=a.id) }}" class="btn btn-sm btn-outline-pia"><i class="bi bi-eye"></i></a>
+            </td>
           </tr>
           {% endfor %}
         </tbody>

@@ -47,7 +47,7 @@
         <thead>
           <tr>
             <th>Date</th><th>Station</th><th>Shift</th><th>Engineer</th><th>Aircraft</th>
-            <th>Activity Type</th><th>Status</th><th>Remarks</th>
+            <th>Activity Type</th><th>Status</th><th>Remarks</th><th class="text-end no-print">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -61,6 +61,9 @@
             <td>{{ a.activity_type | enum_label }}</td>
             <td><span class="badge {{ a.approval_status | badge_class }}">{{ a.approval_status | enum_label }}</span></td>
             <td class="small">{{ a.remarks or '-' }}</td>
+            <td class="text-end no-print">
+              <a href="{{ url_for('engineer.view_activity', activity_id=a.id) }}" class="btn btn-sm btn-outline-pia"><i class="bi bi-eye"></i></a>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
