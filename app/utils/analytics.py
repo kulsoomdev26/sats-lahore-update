@@ -559,6 +559,10 @@ OTHER_REPORT_TYPES = {
     "daily_activity": {"label": "Daily Activity", "types": None},
     "monthly_activity": {"label": "Monthly Activity", "types": None},
     "inspections": {"label": "Aircraft Inspection", "types": INSPECTION_TYPES},
+    # "aircraft_inspected" mirrors compute_kpis()'s aircraft_inspected KPI:
+    # any activity type, as long as an aircraft is attached -- NOT limited
+    # to INSPECTION_TYPES like the "inspections" key above.
+    "aircraft_inspected": {"label": "Aircraft Inspected", "types": None, "require_aircraft": True},
     "maintenance_check": {"label": "Maintenance Check", "types": (ActivityType.MAINTENANCE_CHECK,)},
     "tsr": {"label": "TSR", "types": TSR_TYPES},
     "mic": {"label": "MIC / Scheduled Maintenance", "types": MIC_TYPES},
@@ -577,5 +581,7 @@ def other_report(report_key, filters, sort="date_desc"):
     q = apply_filters(base_query(), {**filters, "status": filters.get("status")}, force_approved=False)
     if cfg["types"]:
         q = q.filter(Activity.activity_type.in_(cfg["types"]))
+    if cfg.get("require_aircraft"):
+        q = q.filter(Activity.aircraft_id.isnot(None))
     rows = apply_sort(q, sort).limit(1000).all()
     return rows, cfg

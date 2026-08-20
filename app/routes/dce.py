@@ -51,7 +51,7 @@ OVERVIEW_STAT_CARDS = [
     {"key": "pending_approvals", "label": "Pending Approvals", "icon": "bi-hourglass-split",
      "report_key": "daily_activity", "extra": {"status": "pending_approval"}},
     {"key": "aircraft_inspected", "label": "Aircraft Inspected", "icon": "bi-airplane",
-     "report_key": "inspections", "extra": {"status": "approved"}},
+     "report_key": "aircraft_inspected", "extra": {"status": "approved"}},
     {"key": "pia_inspections", "label": "PIA Inspections", "icon": "bi-building",
      "report_key": "inspections", "extra": {"status": "approved", "category": "pia"}},
     {"key": "third_party_inspections", "label": "Third-Party Inspections", "icon": "bi-globe",
