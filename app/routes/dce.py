@@ -13,16 +13,18 @@ dce_bp = Blueprint("dce", __name__, url_prefix="/dce")
 
 # --------------------------------------------------------------------------
 # Query-string keys carried forward from the Overview filter bar onto every
-# clickable stat/number so the Activities list it opens reflects the same
-# period/station/shift/aircraft/airline scope the DCE was already looking
-# at. "engineer_id" is deliberately excluded -- the Engineer Summary rows
-# set it explicitly per engineer.
+# clickable stat/number so the Activities list it opens reflects the exact
+# same scope the DCE was already looking at (including engineer/activity
+# type, if the DCE narrowed to those on the filter bar -- otherwise a KPI
+# computed against a filtered engineer would show one number while the
+# Activities list it links to showed every engineer's activities).
 # --------------------------------------------------------------------------
-CARRY_FILTER_KEYS = ("period", "date_from", "date_to", "station_id", "shift_name", "aircraft_id", "airline_id")
+CARRY_FILTER_KEYS = ("period", "date_from", "date_to", "station_id", "shift_name",
+                      "engineer_id", "aircraft_id", "airline_id", "activity_type")
 
 
-def _carry_filters():
-    return {k: v for k, v in request.args.items() if k in CARRY_FILTER_KEYS}
+def _carry_filters(*, exclude=()):
+    return {k: v for k, v in request.args.items() if k in CARRY_FILTER_KEYS and k not in exclude}
 
 
 def _filters():
@@ -87,10 +89,11 @@ def overview_menu():
         for cfg in OVERVIEW_STAT_CARDS
     ]
 
+    carry_no_engineer = _carry_filters(exclude=("engineer_id",))
     engineer_rows = [
         {"engineer": row["engineer"], "activities": row["activities"],
          "url": url_for("dce.other_report_view", report_key="daily_activity",
-                         engineer_id=row["engineer"].id, **carry)}
+                         engineer_id=row["engineer"].id, **carry_no_engineer)}
         for row in A.engineer_performance(filters)
     ]
 
