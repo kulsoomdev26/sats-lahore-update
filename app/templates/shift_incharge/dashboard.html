@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Shift Incharge Dashboard{% endblock %}
+{% block header_title %}Shift Incharge Dashboard{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+  <div>
+    <h4 class="mb-1">Shift Overview</h4>
+    <p class="text-muted mb-0">
+      {% if my_shifts %}
+        Managing: {% for s in my_shifts %}<span class="badge badge-role me-1">{{ s.name.label }} &middot; {{ s.station.code }}</span>{% endfor %}
+      {% else %}
+        No shift is currently assigned to your account.
+      {% endif %}
+    </p>
+  </div>
+  {% if can_approve %}
+  <a href="{{ url_for('shift_incharge.approval_center') }}" class="btn btn-pia-gold">
+    <i class="bi bi-check2-square me-1"></i>Go to Approval Center
+  </a>
+  {% else %}
+  <a href="{{ url_for('shift_incharge.shift_monitoring') }}" class="btn btn-pia-gold">
+    <i class="bi bi-list-check me-1"></i>View Shift Activities
+  </a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <a href="{{ url_for('shift_incharge.shift_monitoring') }}" class="text-decoration-none text-reset">
+      <div class="stat-card">
+        <i class="bi bi-collection stat-icon"></i>
+        <div class="stat-value">{{ kpis.activities }}</div>
+        <div class="stat-label">Activities</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <a href="{{ url_for('shift_incharge.approval_center', tab='pending') if can_approve else url_for('shift_incharge.shift_monitoring', status='pending_approval') }}" class="text-decoration-none text-reset">
+      <div class="stat-card">
+        <i class="bi bi-hourglass-split stat-icon"></i>
+        <div class="stat-value">{{ kpis.pending }}</div>
+        <div class="stat-label">Pending Approvals</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <a href="{{ url_for('shift_incharge.approval_center', tab='approved') if can_approve else url_for('shift_incharge.shift_monitoring', status='approved') }}" class="text-decoration-none text-reset">
+      <div class="stat-card">
+        <i class="bi bi-check-circle stat-icon"></i>
+        <div class="stat-value">{{ kpis.approved }}</div>
+        <div class="stat-label">Approved</div>
+      </div>
+    </a>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <a href="{{ url_for('shift_incharge.approval_center', tab='rejected') if can_approve else url_for('shift_incharge.shift_monitoring', status='rejected') }}" class="text-decoration-none text-reset">
+      <div class="stat-card">
+        <i class="bi bi-x-circle stat-icon"></i>
+        <div class="stat-value">{{ kpis.rejected }}</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<p class="text-muted small mb-2"><i class="bi bi-info-circle me-1"></i>The category counts below reflect <strong>approved</strong> activity only, per the official completed-work statistics rule.</p>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-clipboard2-check stat-icon"></i><div class="stat-value">{{ kpis.maintenance_check }}</div><div class="stat-label">Maintenance Check</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-exclamation-triangle stat-icon"></i><div class="stat-value">{{ kpis.tsr }}</div><div class="stat-label">TSR</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-clipboard2-pulse stat-icon"></i><div class="stat-value">{{ kpis.mic }}</div><div class="stat-label">MIC / Scheduled Maintenance</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-arrow-repeat stat-icon"></i><div class="stat-value">{{ kpis.replacement }}</div><div class="stat-label">Replacement</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-patch-check stat-icon"></i><div class="stat-value">{{ kpis.quality }}</div><div class="stat-label">QARI</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-dash-circle stat-icon"></i><div class="stat-value">{{ kpis.cf_removal }}</div><div class="stat-label">CF Removal</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-arrow-repeat stat-icon"></i><div class="stat-value">{{ kpis.cf }}</div><div class="stat-label">CF</div></div>
+  </div>
+  <div class="col-6 col-md-4 col-xl-3">
+    <div class="stat-card stat-card-sm"><i class="bi bi-wrench-adjustable stat-icon"></i><div class="stat-value">{{ kpis.unscheduled }}</div><div class="stat-label">PIREP / Unscheduled Maintenance</div></div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header-pia"><h6><i class="bi bi-bar-chart me-2"></i>Approved Activity by Category</h6></div>
+      <div class="card-body">
+        {% if kpis.activities %}
+        <canvas id="categoryChart" height="140"></canvas>
+        {% else %}
+          {% set icon = 'bi-bar-chart' %}
+          {% set title = 'No data available yet.' %}
+          {% set subtitle = 'Charts will populate once activities are logged and approved.' %}
+          {% include "partials/empty_state.html" with context %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header-pia"><h6><i class="bi bi-pie-chart me-2"></i>Approval Status</h6></div>
+      <div class="card-body">
+        {% if kpis.activities %}
+        <canvas id="statusChart" height="180"></canvas>
+        {% else %}
+          {% set icon = 'bi-pie-chart' %}
+          {% set title = 'No data available yet.' %}
+          {% set subtitle = 'Nothing has been submitted for your shift yet.' %}
+          {% include "partials/empty_state.html" with context %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header-pia">
+    {% if can_approve %}
+    <h6><i class="bi bi-hourglass-split me-2"></i>Recently Submitted &mdash; Awaiting Your Approval</h6>
+    <a href="{{ url_for('shift_incharge.approval_center', tab='pending') }}" class="btn btn-outline-pia btn-sm">View All</a>
+    {% else %}
+    <h6><i class="bi bi-hourglass-split me-2"></i>Recently Submitted &mdash; Pending Approval</h6>
+    <a href="{{ url_for('shift_incharge.shift_monitoring', status='pending_approval') }}" class="btn btn-outline-pia btn-sm">View All</a>
+    {% endif %}
+  </div>
+  <div class="card-body p-0">
+    {% if recent_pending %}
+    <div class="table-responsive">
+      <table class="table table-pia mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Employee</th><th>Date</th><th>Activity Type</th><th>Aircraft</th><th>Submitted At</th><th class="text-end">{{ 'Action' if can_approve else 'View' }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in recent_pending %}
+          <tr>
+            <td class="small">{{ a.logged_by.full_name if a.logged_by else '-' }}</td>
+            <td class="small">{{ a.activity_date | date_fmt }}</td>
+            <td class="small">{{ a.activity_type | enum_label }}</td>
+            <td class="small">{{ a.aircraft.registration if a.aircraft else '-' }}</td>
+            <td class="small">{{ a.created_at | dt }}</td>
+            <td class="text-end">
+              {% if can_approve %}
+              <a href="{{ url_for('shift_incharge.review_activity', activity_id=a.id) }}" class="btn btn-sm btn-outline-pia"><i class="bi bi-eye"></i> Review</a>
+              {% else %}
+              <a href="{{ url_for('engineer.view_activity', activity_id=a.id) }}" class="btn btn-sm btn-outline-pia"><i class="bi bi-eye"></i> View</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      {% set icon = 'bi-check2-circle' %}
+      {% set title = 'Nothing waiting on you.' %}
+      {% set subtitle = 'New submissions from your shift will show up here.' %}
+      {% include "partials/empty_state.html" with context %}
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+{% if kpis.activities %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  const categoryChartEl = document.getElementById('categoryChart');
+  if (categoryChartEl) {
+    new Chart(categoryChartEl, {
+      type: 'bar',
+      data: {
+        labels: {{ category_chart.labels | tojson }},
+        datasets: [{
+          label: 'Approved Activities',
+          data: {{ category_chart.data | tojson }},
+          backgroundColor: '#0d5c3f',
+          borderRadius: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  const statusChartEl = document.getElementById('statusChart');
+  if (statusChartEl) {
+    new Chart(statusChartEl, {
+      type: 'doughnut',
+      data: {
+        labels: {{ status_chart.labels | tojson }},
+        datasets: [{
+          data: {{ status_chart.data | tojson }},
+          backgroundColor: ['#e8b93b', '#0d5c3f', '#c0392b'],
+        }]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

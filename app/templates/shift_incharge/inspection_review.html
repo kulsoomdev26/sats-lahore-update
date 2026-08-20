@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Review Inspection #{{ inspection.id }}{% endblock %}
+{% block header_title %}Review Inspection #{{ inspection.id }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h5 class="mb-1">Engineer Inspection Form #{{ inspection.id }}</h5>
+    <span class="badge {{ inspection.approval_status | badge_class }}">{{ inspection.approval_status | enum_label }}</span>
+  </div>
+  <a href="{{ url_for('shift_incharge.inspection_approval_center', tab=back_tab) }}" class="btn btn-light border btn-sm">Back to Approval Center</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-info-circle me-2"></i>Submission</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3"><div class="small text-muted">Primary Engineer</div><div>{{ inspection.primary_engineer.full_name if inspection.primary_engineer else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Second Engineer</div><div>{{ inspection.second_engineer.full_name if inspection.second_engineer else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Date</div><div>{{ inspection.inspection_date | date_fmt }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Shift</div><div>{{ inspection.shift.name.label if inspection.shift else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Station</div><div>{{ inspection.station.name if inspection.station else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Airline</div><div>{{ inspection.airline.name if inspection.airline else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Aircraft</div><div>{{ inspection.aircraft.registration if inspection.aircraft else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Submitted At</div><div>{{ inspection.created_at | dt }}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-award me-2"></i>Credit Split</h6></div>
+      <div class="card-body">
+        {% if inspection.is_shared %}
+        <p class="mb-0">Shared: <strong>{{ inspection.primary_engineer.full_name }}</strong> 0.5, <strong>{{ inspection.second_engineer.full_name }}</strong> 0.5 (also applied to every Yes-marked activity below).</p>
+        {% else %}
+        <p class="mb-0">Solo: <strong>{{ inspection.primary_engineer.full_name if inspection.primary_engineer else '-' }}</strong> receives full credit (1.0).</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-ui-checks me-2"></i>Activity Checklist</h6></div>
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Activity</th><th>Performed</th><th>Remarks</th></tr></thead>
+            <tbody>
+              {% for entry in inspection.entries %}
+              <tr class="{{ 'table-success' if entry.performed else '' }}">
+                <td>{{ entry.activity_type | enum_label }}</td>
+                <td>{{ 'Yes' if entry.performed else 'No' }}</td>
+                <td>{{ entry.remarks or '-' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-file-text me-2"></i>Overall Remarks</h6></div>
+      <div class="card-body">{{ inspection.overall_remarks or 'No remarks.' }}</div>
+    </div>
+
+    {% if inspection.approval_status.value != 'pending_approval' %}
+    <div class="card">
+      <div class="card-header-pia"><h6><i class="bi bi-clipboard-check me-2"></i>Review Decision</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4"><div class="small text-muted">Reviewed By</div><div>{{ inspection.approved_by.full_name if inspection.approved_by else '-' }}</div></div>
+          <div class="col-md-4"><div class="small text-muted">Reviewed At</div><div>{{ inspection.approved_at | dt }}</div></div>
+          <div class="col-md-4"><div class="small text-muted">Status</div><div><span class="badge {{ inspection.approval_status | badge_class }}">{{ inspection.approval_status | enum_label }}</span></div></div>
+          <div class="col-md-12"><div class="small text-muted">Remarks</div><div>{{ inspection.approval_remarks or '-' }}</div></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    {% if inspection.approval_status.value == 'pending_approval' %}
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-check-circle me-2"></i>Approve</h6></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('shift_incharge.approve_inspection', inspection_id=inspection.id) }}">
+          {{ approve_form.hidden_tag() }}
+          <div class="mb-3">
+            {{ approve_form.remarks.label(class="form-label small") }} <span class="text-muted">(optional)</span>
+            {{ approve_form.remarks(class="form-control", rows="3") }}
+          </div>
+          <button type="submit" class="btn btn-pia-primary w-100"><i class="bi bi-check-lg me-1"></i>Approve Inspection</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header-pia"><h6><i class="bi bi-x-circle me-2"></i>Reject</h6></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('shift_incharge.reject_inspection', inspection_id=inspection.id) }}">
+          {{ reject_form.hidden_tag() }}
+          <div class="mb-3">
+            {{ reject_form.remarks.label(class="form-label small") }} <span class="required-mark">*</span>
+            {{ reject_form.remarks(class="form-control" + (" is-invalid" if reject_form.remarks.errors else ""), rows="3", placeholder="Explain why this inspection is being rejected...") }}
+            {% for error in reject_form.remarks.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+          </div>
+          <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-x-lg me-1"></i>Reject Inspection</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+      {% set icon = 'bi-clipboard-check' if inspection.approval_status.value == 'approved' else 'bi-x-octagon' %}
+      {% set title = 'Already reviewed.' %}
+      {% set subtitle = 'This inspection has already been ' + (inspection.approval_status | enum_label | lower) + '.' %}
+      {% include "partials/empty_state.html" with context %}
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

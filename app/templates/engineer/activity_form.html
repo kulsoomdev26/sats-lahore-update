@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Log New Activity' if mode == 'create' else 'Edit Activity' }}{% endblock %}
+{% block header_title %}{{ 'Log New Activity' if mode == 'create' else 'Edit Activity' }}{% endblock %}
+{% block content %}
+
+<div id="savedActivitiesWrap" class="card mb-3" style="display:none;">
+  <div class="card-body py-2">
+    <div class="small text-muted mb-1"><i class="bi bi-list-check me-1"></i>Activities saved this session</div>
+    <ul id="savedActivitiesList" class="list-group list-group-flush"></ul>
+  </div>
+</div>
+
+<div id="successPanel" class="card mb-3" style="display:none;">
+  <div class="card-body text-center py-4">
+    <i class="bi bi-check-circle-fill text-success" style="font-size:2rem;"></i>
+    <h6 class="mt-2 mb-3">Activity saved successfully.</h6>
+    <button type="button" id="btnAddAnother" class="btn btn-pia-gold me-2">
+      <i class="bi bi-plus-lg me-1"></i>Add Another Activity
+    </button>
+    <a href="{{ url_for('engineer.list_activities') }}" id="btnClose" class="btn btn-light border">Close</a>
+  </div>
+</div>
+
+<div class="card" id="activityFormCard">
+  <div class="card-header-pia">
+    <h6><i class="bi bi-journal-plus me-2"></i>{{ 'Engineer Activity' if mode == 'create' else 'Edit Activity #' + activity.id|string }}</h6>
+  </div>
+  <div class="card-body">
+    <div id="formAlert" class="alert alert-danger" style="display:none;"></div>
+    <form method="POST" novalidate id="activityForm" data-mode="{{ mode }}"
+          {% if mode == 'edit' %}data-edit-url="{{ url_for('engineer.edit_activity', activity_id=activity.id) }}"{% endif %}>
+      {{ form.hidden_tag() }}
+
+      <h6 class="text-pia-green mb-3"><i class="bi bi-info-circle me-1"></i>Basic Information</h6>
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          {{ form.activity_date.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.activity_date(class="form-control" + (" is-invalid" if form.activity_date.errors else "")) }}
+          {% for e in form.activity_date.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          {{ form.shift_id.label(class="form-label") }}
+          {{ form.shift_id(class="form-select") }}
+        </div>
+        <div class="col-md-3">
+          {{ form.airline_id.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.airline_id(class="form-select" + (" is-invalid" if form.airline_id.errors else ""), id="airlineSelect") }}
+          {% for e in form.airline_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+          <div class="form-text">Station: Lahore</div>
+        </div>
+        <div class="col-md-3">
+          {{ form.coverage_type.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.coverage_type(class="form-select" + (" is-invalid" if form.coverage_type.errors else "")) }}
+          {% for e in form.coverage_type.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="col-md-3" id="aircraftDropdownWrap">
+          {{ form.aircraft_id.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.aircraft_id(class="form-select" + (" is-invalid" if form.aircraft_id.errors else ""), id="aircraftSelect") }}
+          {% for e in form.aircraft_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3" id="aircraftManualRegWrap" style="display:none;">
+          {{ form.aircraft_registration_manual.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.aircraft_registration_manual(class="form-control" + (" is-invalid" if form.aircraft_registration_manual.errors else "")) }}
+          {% for e in form.aircraft_registration_manual.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3" id="aircraftManualModelWrap" style="display:none;">
+          {{ form.aircraft_model_manual.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.aircraft_model_manual(class="form-control" + (" is-invalid" if form.aircraft_model_manual.errors else "")) }}
+          {% for e in form.aircraft_model_manual.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+
+        <div class="col-md-3">
+          {{ form.flight_number.label(class="form-label") }}
+          {{ form.flight_number(class="form-control") }}
+        </div>
+        {% if current_user.is_super_admin %}
+        <div class="col-md-3">
+          {{ form.engineer_id.label(class="form-label") }}
+          {{ form.engineer_id(class="form-select") }}
+          <div class="form-text">Defaults to you if left unselected.</div>
+        </div>
+        {% endif %}
+
+        <div class="col-md-4">
+          {{ form.activity_type.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.activity_type(class="form-select" + (" is-invalid" if form.activity_type.errors else ""), id="activityType") }}
+          {% for e in form.activity_type.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <!-- Maintenance Check -->
+      <div class="section-toggle" data-section="maintenance_check">
+        <h6 class="text-pia-green mb-3"><i class="bi bi-clipboard2-check me-1"></i>Maintenance Check</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            {{ form.maintenance_check_type.label(class="form-label") }}
+            {{ form.maintenance_check_type(class="form-select") }}
+          </div>
+          <div class="col-md-4">
+            {{ form.mc_remarks.label(class="form-label") }}
+            {{ form.mc_remarks(class="form-control", rows="2") }}
+          </div>
+          <div class="col-md-5">
+            {{ form.mc_details.label(class="form-label") }}
+            {{ form.mc_details(class="form-control", rows="2") }}
+          </div>
+        </div>
+        <div class="row g-3 mb-4 align-items-start">
+          <div class="col-md-3">
+            {{ form.is_crs.label(class="form-label") }} <span class="required-mark">*</span>
+            {{ form.is_crs(class="form-select" + (" is-invalid" if form.is_crs.errors else ""), id="isCrsSelect") }}
+            {% for e in form.is_crs.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            <div class="form-text">"Yes" means you are the CRS engineer for this check.</div>
+          </div>
+          <div class="col-md-4" id="crsEngineerWrap" style="display:none;">
+            {{ form.crs_engineer_id.label(class="form-label") }}
+            {{ form.crs_engineer_id(class="form-select" + (" is-invalid" if form.crs_engineer_id.errors else "")) }}
+            {% for e in form.crs_engineer_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            <div class="form-text">You will be recorded as Second Engineer.</div>
+          </div>
+          <div class="col-md-4" id="secondEngineerWrap" style="display:none;">
+            {{ form.second_engineer_id.label(class="form-label") }}
+            {{ form.second_engineer_id(class="form-select") }}
+            <div class="form-text">You will be recorded as CRS.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MIC / Scheduled Maintenance -->
+      <div class="section-toggle" data-section="mic_scheduled_maintenance">
+        <h6 class="text-pia-green mb-3"><i class="bi bi-clipboard2-pulse me-1"></i>MIC / Scheduled Maintenance</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            {{ form.mic_type.label(class="form-label") }}
+            {{ form.mic_type(class="form-control") }}
+          </div>
+          <div class="col-md-8">
+            {{ form.mic_description.label(class="form-label") }}
+            {{ form.mic_description(class="form-control", rows="2") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- QARI -->
+      <div class="section-toggle" data-section="qari">
+        <h6 class="text-pia-green mb-3"><i class="bi bi-patch-check me-1"></i>QARI <span class="small text-muted">(max 2 entries)</span></h6>
+        {% if form.qari_entries.errors %}
+          <div class="text-danger small mb-2">{{ form.qari_entries.errors[0] }}</div>
+        {% endif %}
+        <div id="qariEntries">
+          {% for entry in form.qari_entries %}
+          <div class="qari-entry border rounded p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <strong class="small text-muted">QARI Entry {{ loop.index }}</strong>
+              {% if loop.index > 1 %}<button type="button" class="btn btn-sm btn-outline-danger remove-qari"><i class="bi bi-trash"></i></button>{% endif %}
+            </div>
+            <div class="row g-3">
+              <div class="col-md-3">
+                {{ entry.form.severity.label(class="form-label") }}
+                {{ entry.form.severity(class="form-select") }}
+              </div>
+              <div class="col-md-3">
+                {{ entry.form.qari_number.label(class="form-label") }}
+                {{ entry.form.qari_number(class="form-control") }}
+              </div>
+              <div class="col-md-3">
+                {{ entry.form.sari_closed_count.label(class="form-label") }}
+                {{ entry.form.sari_closed_count(class="form-control") }}
+              </div>
+              <div class="col-md-3">
+                {{ entry.form.status.label(class="form-label") }}
+                {{ entry.form.status(class="form-select") }}
+              </div>
+              <div class="col-md-12">
+                {{ entry.form.short_description.label(class="form-label") }}
+                {{ entry.form.short_description(class="form-control", rows="2") }}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <button type="button" id="addQariBtn" class="btn btn-sm btn-outline-secondary mb-4">
+          <i class="bi bi-plus-lg me-1"></i>Add Another QARI
+        </button>
+      </div>
+
+      <!-- TSR -->
+      <div class="section-toggle" data-section="tsr">
+        <h6 class="text-pia-green mb-3"><i class="bi bi-exclamation-triangle me-1"></i>TSR</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            {{ form.tsr_number.label(class="form-label") }}
+            {{ form.tsr_number(class="form-control") }}
+          </div>
+          <div class="col-md-3">
+            {{ form.tsr_status.label(class="form-label") }}
+            {{ form.tsr_status(class="form-select") }}
+          </div>
+          <div class="col-md-6">
+            {{ form.tsr_description.label(class="form-label") }}
+            {{ form.tsr_description(class="form-control", rows="2") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- PIREP / Unscheduled Maintenance -->
+      <div class="section-toggle" data-section="pirep_unscheduled_maintenance">
+        <h6 class="text-pia-green mb-3"><i class="bi bi-wrench-adjustable me-1"></i>PIREP / Unscheduled Maintenance</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            {{ form.pirep_status.label(class="form-label") }}
+            {{ form.pirep_status(class="form-select") }}
+          </div>
+          <div class="col-md-8">
+            {{ form.pirep_short_description.label(class="form-label") }}
+            {{ form.pirep_short_description(class="form-control", rows="2") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- CF Removal -->
+      <div class="section-toggle" data-section="cf_removal">
+        <h6 class="text-pia-green mb-3"><i class="bi bi-dash-circle me-1"></i>CF Removal</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            {{ form.cf_removed.label(class="form-label") }}
+            {{ form.cf_removed(class="form-select") }}
+          </div>
+          <div class="col-md-9">
+            {{ form.cf_removal_details.label(class="form-label") }}
+            {{ form.cf_removal_details(class="form-control", rows="2") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Replacement -->
+      <div class="section-toggle" data-section="replacement">
+        <h6 class="text-pia-green mb-3"><i class="bi bi-arrow-repeat me-1"></i>Replacement</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            {{ form.replacement_component.label(class="form-label") }}
+            {{ form.replacement_component(class="form-control") }}
+          </div>
+          <div class="col-md-8">
+            {{ form.replacement_details.label(class="form-label") }}
+            {{ form.replacement_details(class="form-control", rows="2") }}
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{{ url_for('engineer.list_activities') }}" class="btn btn-light border">Cancel</a>
+        {{ form.submit(class="btn btn-pia-gold") }}
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var CATEGORY_SECTIONS = [
+    "maintenance_check", "mic_scheduled_maintenance", "qari", "tsr",
+    "pirep_unscheduled_maintenance", "cf_removal", "replacement"
+  ];
+
+  var form = document.getElementById("activityForm");
+  var activityType = document.getElementById("activityType");
+  var airlineSelect = document.getElementById("airlineSelect");
+  var aircraftSelect = document.getElementById("aircraftSelect");
+  var aircraftDropdownWrap = document.getElementById("aircraftDropdownWrap");
+  var aircraftManualRegWrap = document.getElementById("aircraftManualRegWrap");
+  var aircraftManualModelWrap = document.getElementById("aircraftManualModelWrap");
+  var isCrsSelect = document.getElementById("isCrsSelect");
+  var crsEngineerWrap = document.getElementById("crsEngineerWrap");
+  var secondEngineerWrap = document.getElementById("secondEngineerWrap");
+  var qariEntries = document.getElementById("qariEntries");
+  var addQariBtn = document.getElementById("addQariBtn");
+
+  // ---- Activity-type conditional sections ----
+  function applyVisibility() {
+    var active = activityType.value;
+    document.querySelectorAll(".section-toggle").forEach(function (sec) {
+      sec.style.display = (sec.getAttribute("data-section") === active) ? "" : "none";
+    });
+  }
+  if (activityType) {
+    activityType.addEventListener("change", applyVisibility);
+    applyVisibility();
+  }
+
+  // ---- Airline -> PIA dropdown vs manual entry ----
+  function isPiaOption(opt) {
+    return opt && opt.text && opt.text.trim().toUpperCase() === "PIA";
+  }
+
+  function applyAirlineMode() {
+    var opt = airlineSelect.options[airlineSelect.selectedIndex];
+    var pia = isPiaOption(opt);
+    aircraftDropdownWrap.style.display = pia ? "" : "none";
+    aircraftManualRegWrap.style.display = pia ? "none" : "";
+    aircraftManualModelWrap.style.display = pia ? "none" : "";
+  }
+
+  function reloadAircraftOptions() {
+    var airlineId = airlineSelect.value;
+    if (!airlineId) { aircraftSelect.innerHTML = '<option value="0">-- Select Aircraft --</option>'; return; }
+    fetch("{{ url_for('engineer.inspection_aircraft_options') }}?airline_id=" + encodeURIComponent(airlineId))
+      .then(function (r) { return r.json(); })
+      .then(function (list) {
+        var html = '<option value="0">-- Select Aircraft --</option>';
+        list.forEach(function (a) {
+          html += '<option value="' + a.id + '">' + a.registration + ' - ' + a.aircraft_type + '</option>';
+        });
+        aircraftSelect.innerHTML = html;
+      });
+  }
+
+  if (airlineSelect) {
+    airlineSelect.addEventListener("change", function () {
+      applyAirlineMode();
+      reloadAircraftOptions();
+    });
+    applyAirlineMode();
+  }
+
+  // ---- CRS Yes/No toggle ----
+  function applyCrsMode() {
+    if (!isCrsSelect) return;
+    var v = isCrsSelect.value;
+    crsEngineerWrap.style.display = (v === "no") ? "" : "none";
+    secondEngineerWrap.style.display = (v === "yes") ? "" : "none";
+  }
+  if (isCrsSelect) {
+    isCrsSelect.addEventListener("change", applyCrsMode);
+    applyCrsMode();
+  }
+
+  // ---- QARI: add / remove entries (max 2) ----
+  function qariCount() { return qariEntries.querySelectorAll(".qari-entry").length; }
+
+  function updateAddQariBtn() {
+    addQariBtn.style.display = qariCount() >= 2 ? "none" : "";
+  }
+
+  if (addQariBtn) {
+    addQariBtn.addEventListener("click", function () {
+      if (qariCount() >= 2) return;
+      var first = qariEntries.querySelector(".qari-entry");
+      var clone = first.cloneNode(true);
+      clone.querySelectorAll("input, textarea, select").forEach(function (el) {
+        var name = el.getAttribute("name");
+        if (name) el.setAttribute("name", name.replace(/qari_entries-0-/, "qari_entries-1-"));
+        var id = el.getAttribute("id");
+        if (id) el.setAttribute("id", id.replace(/qari_entries-0-/, "qari_entries-1-"));
+        if (el.tagName === "SELECT") { el.selectedIndex = 0; } else { el.value = ""; }
+      });
+      clone.querySelector("strong").textContent = "QARI Entry 2";
+      var removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "btn btn-sm btn-outline-danger remove-qari";
+      removeBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      var header = clone.querySelector(".d-flex");
+      header.innerHTML = '<strong class="small text-muted">QARI Entry 2</strong>';
+      header.appendChild(removeBtn);
+      qariEntries.appendChild(clone);
+      updateAddQariBtn();
+    });
+  }
+
+  qariEntries.addEventListener("click", function (e) {
+    var btn = e.target.closest(".remove-qari");
+    if (!btn) return;
+    btn.closest(".qari-entry").remove();
+    updateAddQariBtn();
+  });
+  updateAddQariBtn();
+
+  // ---- Save Activity -> Add Another Activity flow ----
+  var SESSION_KEY = "sats_session_activities";
+  var savedListEl = document.getElementById("savedActivitiesList");
+  var savedWrap = document.getElementById("savedActivitiesWrap");
+  var successPanel = document.getElementById("successPanel");
+  var formCard = document.getElementById("activityFormCard");
+  var formAlert = document.getElementById("formAlert");
+
+  function getSessionActivities() {
+    try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "[]"); }
+    catch (e) { return []; }
+  }
+  function renderSessionActivities() {
+    var items = getSessionActivities();
+    if (!items.length) { savedWrap.style.display = "none"; return; }
+    savedWrap.style.display = "";
+    savedListEl.innerHTML = items.map(function (it) {
+      return '<li class="list-group-item d-flex justify-content-between align-items-center px-0 py-1">' +
+        '<span><i class="bi bi-check2-circle text-success me-1"></i>' + it.activity_type_label +
+        (it.detail_summary && it.detail_summary !== '-' ? ' — ' + it.detail_summary : '') + '</span>' +
+        '<a class="small" href="' + it.view_url + '">View</a></li>';
+    }).join("");
+  }
+  renderSessionActivities();
+
+  // Fields kept between activities (per spec): Date, Shift, Airline,
+  // Aircraft, Flight No., Coverage Type. Everything else is cleared.
+  function resetActivitySpecificFields() {
+    activityType.selectedIndex = 0;
+    document.querySelectorAll(".section-toggle input, .section-toggle textarea, .section-toggle select").forEach(function (el) {
+      if (el.tagName === "SELECT") { el.selectedIndex = 0; } else { el.value = ""; }
+    });
+    // Collapse QARI back down to a single entry.
+    var extras = qariEntries.querySelectorAll(".qari-entry");
+    extras.forEach(function (el, idx) { if (idx > 0) el.remove(); });
+    updateAddQariBtn();
+    applyVisibility();
+    applyCrsMode();
+    formAlert.style.display = "none";
+    formAlert.innerHTML = "";
+  }
+
+  if (form && form.getAttribute("data-mode") === "create") {
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var submitBtn = form.querySelector('[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      fetch(form.action || window.location.href, {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: new FormData(form),
+      })
+        .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+        .then(function (res) {
+          if (submitBtn) submitBtn.disabled = false;
+          if (!res.ok || !res.data.success) {
+            var msgs = [];
+            var errs = (res.data && res.data.errors) || {};
+            Object.keys(errs).forEach(function (k) {
+              errs[k].forEach(function (m) { msgs.push(m); });
+            });
+            formAlert.innerHTML = msgs.length ? msgs.join("<br>") : "Please check the form for errors.";
+            formAlert.style.display = "";
+            return;
+          }
+          var items = getSessionActivities();
+          items.push(res.data);
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(items));
+          renderSessionActivities();
+          formCard.style.display = "none";
+          successPanel.style.display = "";
+        })
+        .catch(function () {
+          if (submitBtn) submitBtn.disabled = false;
+          formAlert.innerHTML = "Something went wrong saving this activity. Please try again.";
+          formAlert.style.display = "";
+        });
+    });
+
+    document.getElementById("btnAddAnother").addEventListener("click", function () {
+      resetActivitySpecificFields();
+      successPanel.style.display = "none";
+      formCard.style.display = "";
+    });
+
+    document.getElementById("btnClose").addEventListener("click", function () {
+      sessionStorage.removeItem(SESSION_KEY);
+    });
+  } else {
+    // Edit mode: keep the simple full-page submit, no session list.
+    savedWrap.style.display = "none";
+  }
+})();
+</script>
+{% endblock %}

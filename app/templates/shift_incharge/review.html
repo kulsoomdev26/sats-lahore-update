@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Review Activity #{{ activity.id }}{% endblock %}
+{% block header_title %}Review Activity #{{ activity.id }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h5 class="mb-1">{{ activity.activity_type | enum_label }}</h5>
+    <span class="badge {{ activity.approval_status | badge_class }}">{{ activity.approval_status | enum_label }}</span>
+  </div>
+  <a href="{{ url_for('shift_incharge.approval_center', tab=back_tab) }}" class="btn btn-light border btn-sm">Back to Approval Center</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-info-circle me-2"></i>Submission</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3"><div class="small text-muted">Employee</div><div>{{ activity.logged_by.full_name if activity.logged_by else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Date</div><div>{{ activity.activity_date | date_fmt }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Shift</div><div>{{ activity.shift.name.label if activity.shift else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Station</div><div>{{ activity.station.name if activity.station else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Aircraft</div><div>{{ activity.aircraft.registration if activity.aircraft else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Airline</div><div>{{ activity.aircraft.airline.name if activity.aircraft and activity.aircraft.airline else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Activity Type</div><div>{{ activity.activity_type | enum_label }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Submitted At</div><div>{{ activity.created_at | dt }}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-file-text me-2"></i>Details</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% if activity.category == 'maintenance_check' %}
+          <div class="col-md-3"><div class="small text-muted">Number Checked</div><div>{{ activity.num_aircraft_checked if activity.num_aircraft_checked is not none else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Result</div><div>{{ activity.inspection_result or '-' }}</div></div>
+          <div class="col-md-6"><div class="small text-muted">Inspection Details</div><div>{{ activity.inspection_details or '-' }}</div></div>
+          {% elif activity.category == 'pirep_unscheduled' %}
+          <div class="col-md-3"><div class="small text-muted">Number Checked</div><div>{{ activity.num_aircraft_checked if activity.num_aircraft_checked is not none else '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Result</div><div>{{ activity.inspection_result or '-' }}</div></div>
+          <div class="col-md-6"><div class="small text-muted">Inspection Details</div><div>{{ activity.inspection_details or '-' }}</div></div>
+          {% elif activity.category in ('cf', 'cf_removal', 'replacement') %}
+          <div class="col-md-3"><div class="small text-muted">Maintenance Type</div><div>{{ activity.maintenance_type | enum_label }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Component</div><div>{{ activity.component or '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Start / End</div><div>{{ activity.start_time | time12 }} &rarr; {{ activity.end_time | time12 }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Status</div><div><span class="badge {{ activity.maintenance_status | badge_class }}">{{ activity.maintenance_status | enum_label }}</span></div></div>
+          <div class="col-md-12"><div class="small text-muted">Work Description</div><div>{{ activity.maintenance_details or '-' }}</div></div>
+          {% elif activity.category == 'tsr' %}
+          <div class="col-md-3"><div class="small text-muted">TSR Number</div><div>{{ activity.tsr_number or '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Status</div><div><span class="badge {{ activity.tsr_status | badge_class }}">{{ activity.tsr_status | enum_label }}</span></div></div>
+          {% elif activity.category == 'mic' %}
+          <div class="col-md-3"><div class="small text-muted">MIC Ref</div><div>{{ activity.mic_number or '-' }}</div></div>
+          <div class="col-md-3"><div class="small text-muted">Status</div><div><span class="badge {{ activity.mic_status | badge_class }}">{{ activity.mic_status | enum_label }}</span></div></div>
+          {% elif activity.category == 'quality' %}
+          <div class="col-md-4"><div class="small text-muted">Inspection Type</div><div>{{ activity.quality_inspection_type or '-' }}</div></div>
+          <div class="col-md-4"><div class="small text-muted">Status</div><div><span class="badge {{ activity.quality_status | badge_class }}">{{ activity.quality_status | enum_label }}</span></div></div>
+          <div class="col-md-12"><div class="small text-muted">Finding</div><div>{{ activity.quality_finding or '-' }}</div></div>
+          {% endif %}
+          <div class="col-md-12"><div class="small text-muted">Remarks</div><div>{{ activity.remarks or 'No remarks.' }}</div></div>
+        </div>
+      </div>
+    </div>
+
+    {% if activity.approval_status.value != 'pending_approval' %}
+    <div class="card">
+      <div class="card-header-pia"><h6><i class="bi bi-clipboard-check me-2"></i>Review Decision</h6></div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4"><div class="small text-muted">Reviewed By</div><div>{{ activity.approved_by.full_name if activity.approved_by else '-' }}</div></div>
+          <div class="col-md-4"><div class="small text-muted">Reviewed At</div><div>{{ activity.approved_at | dt }}</div></div>
+          <div class="col-md-4"><div class="small text-muted">Status</div><div><span class="badge {{ activity.approval_status | badge_class }}">{{ activity.approval_status | enum_label }}</span></div></div>
+          <div class="col-md-12"><div class="small text-muted">Remarks</div><div>{{ activity.approval_remarks or '-' }}</div></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    {% if activity.approval_status.value == 'pending_approval' %}
+    <div class="card mb-3">
+      <div class="card-header-pia"><h6><i class="bi bi-check-circle me-2"></i>Approve</h6></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('shift_incharge.approve_activity', activity_id=activity.id) }}">
+          {{ approve_form.hidden_tag() }}
+          <div class="mb-3">
+            {{ approve_form.remarks.label(class="form-label small") }} <span class="text-muted">(optional)</span>
+            {{ approve_form.remarks(class="form-control", rows="3") }}
+          </div>
+          <button type="submit" class="btn btn-pia-primary w-100"><i class="bi bi-check-lg me-1"></i>Approve Activity</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header-pia"><h6><i class="bi bi-x-circle me-2"></i>Reject</h6></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('shift_incharge.reject_activity', activity_id=activity.id) }}">
+          {{ reject_form.hidden_tag() }}
+          <div class="mb-3">
+            {{ reject_form.remarks.label(class="form-label small") }} <span class="required-mark">*</span>
+            {{ reject_form.remarks(class="form-control" + (" is-invalid" if reject_form.remarks.errors else ""), rows="3", placeholder="Explain why this activity is being rejected...") }}
+            {% for error in reject_form.remarks.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+          </div>
+          <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-x-lg me-1"></i>Reject Activity</button>
+        </form>
+      </div>
+    </div>
+    {% else %}
+      {% set icon = 'bi-clipboard-check' if activity.approval_status.value == 'approved' else 'bi-x-octagon' %}
+      {% set title = 'Already reviewed.' %}
+      {% set subtitle = 'This activity has already been ' + (activity.approval_status | enum_label | lower) + '.' %}
+      {% include "partials/empty_state.html" with context %}
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

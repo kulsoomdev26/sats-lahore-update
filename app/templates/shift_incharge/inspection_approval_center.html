@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Inspection Approvals{% endblock %}
+{% block header_title %}Inspection Approvals{% endblock %}
+{% block content %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{{ url_for('shift_incharge.inspection_approval_center', tab='pending') }}" class="btn btn-sm {{ 'btn-pia-primary' if tab == 'pending' else 'btn-light border' }}">
+    Pending <span class="badge badge-pending ms-1">{{ counts.pending }}</span>
+  </a>
+  <a href="{{ url_for('shift_incharge.inspection_approval_center', tab='approved') }}" class="btn btn-sm {{ 'btn-pia-primary' if tab == 'approved' else 'btn-light border' }}">
+    Approved <span class="badge badge-approved ms-1">{{ counts.approved }}</span>
+  </a>
+  <a href="{{ url_for('shift_incharge.inspection_approval_center', tab='rejected') }}" class="btn btn-sm {{ 'btn-pia-primary' if tab == 'rejected' else 'btn-light border' }}">
+    Rejected <span class="badge badge-rejected ms-1">{{ counts.rejected }}</span>
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-header-pia">
+    <h6>
+      <i class="bi {{ 'bi-hourglass-split' if tab == 'pending' else ('bi-check-circle' if tab == 'approved' else 'bi-x-circle') }} me-2"></i>
+      {{ tab | capitalize }} Inspections
+    </h6>
+    <span class="badge badge-role">{{ pagination.total }} record{{ 's' if pagination.total != 1 }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if inspections %}
+    <div class="table-responsive">
+      <table class="table table-pia mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Primary Engineer</th>
+            <th>Second Engineer</th>
+            <th>Date</th>
+            <th>Shift</th>
+            <th>Aircraft</th>
+            <th>Airline</th>
+            <th>Yes Activities</th>
+            <th>Submitted At</th>
+            <th>Status</th>
+            <th>Remarks</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i in inspections %}
+          <tr>
+            <td class="small">{{ i.primary_engineer.full_name if i.primary_engineer else '-' }}</td>
+            <td class="small">{{ i.second_engineer.full_name if i.second_engineer else '-' }}</td>
+            <td class="small">{{ i.inspection_date | date_fmt }}</td>
+            <td class="small">{{ i.shift.name.label if i.shift else '-' }}</td>
+            <td class="small">{{ i.aircraft.registration if i.aircraft else '-' }}</td>
+            <td class="small">{{ i.airline.name if i.airline else '-' }}</td>
+            <td class="small">{{ i.performed_entries | length }}</td>
+            <td class="small">{{ i.created_at | dt }}</td>
+            <td><span class="badge {{ i.approval_status | badge_class }}">{{ i.approval_status | enum_label }}</span></td>
+            <td class="small" style="max-width: 180px;">{{ i.approval_remarks or '-' }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{{ url_for('shift_incharge.review_inspection', inspection_id=i.id) }}" class="btn btn-sm btn-outline-pia"><i class="bi bi-eye"></i></a>
+              {% if tab == 'pending' %}
+              <button type="button" class="btn btn-sm btn-pia-primary" data-bs-toggle="modal" data-bs-target="#approveModal{{ i.id }}"><i class="bi bi-check-lg"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ i.id }}"><i class="bi bi-x-lg"></i></button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <div class="pagination-wrap p-3">
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+            <a class="page-link" href="{{ url_for('shift_incharge.inspection_approval_center', tab=tab, page=pagination.prev_num) }}">Previous</a>
+          </li>
+          {% for p in pagination.iter_pages() %}
+            {% if p %}
+              <li class="page-item {{ 'active' if p == pagination.page }}">
+                <a class="page-link" href="{{ url_for('shift_incharge.inspection_approval_center', tab=tab, page=p) }}">{{ p }}</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+          {% endfor %}
+          <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+            <a class="page-link" href="{{ url_for('shift_incharge.inspection_approval_center', tab=tab, page=pagination.next_num) }}">Next</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+      {% set icon = 'bi-check2-square' %}
+      {% set title = 'No ' + tab + ' inspections.' %}
+      {% set subtitle = 'Records will appear here as engineers submit inspection forms for your shift.' %}
+      {% include "partials/empty_state.html" with context %}
+    {% endif %}
+  </div>
+</div>
+
+{% if tab == 'pending' %}
+{% for i in inspections %}
+<div class="modal fade" id="approveModal{{ i.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('shift_incharge.approve_inspection', inspection_id=i.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-check-circle text-success me-2"></i>Approve Inspection #{{ i.id }}</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">Inspection logged by {{ i.primary_engineer.full_name if i.primary_engineer else '-' }} on {{ i.inspection_date | date_fmt }}.</p>
+          <label class="form-label small">Approval Remarks <span class="text-muted">(optional)</span></label>
+          <textarea name="remarks" class="form-control" rows="3" placeholder="Optional remarks..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-pia-primary"><i class="bi bi-check-lg me-1"></i>Approve</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="rejectModal{{ i.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('shift_incharge.reject_inspection', inspection_id=i.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-x-circle text-danger me-2"></i>Reject Inspection #{{ i.id }}</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">Inspection logged by {{ i.primary_engineer.full_name if i.primary_engineer else '-' }} on {{ i.inspection_date | date_fmt }}.</p>
+          <label class="form-label small">Rejection Remarks <span class="required-mark">*</span></label>
+          <textarea name="remarks" class="form-control" rows="3" placeholder="Explain why this inspection is being rejected..." required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Reject</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}

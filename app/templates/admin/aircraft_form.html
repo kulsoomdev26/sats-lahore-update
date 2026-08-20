@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit Aircraft' if mode == 'edit' else 'Add Aircraft' }}{% endblock %}
+{% block header_title %}{{ 'Edit Aircraft' if mode == 'edit' else 'Add Aircraft' }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header-pia">
+    <h6><i class="bi bi-airplane me-2"></i>{{ 'Edit Aircraft' if mode == 'edit' else 'Add New Aircraft' }}</h6>
+    <a href="{{ url_for('admin_aircraft.list_aircraft') }}" class="btn btn-sm btn-light"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  </div>
+  <div class="card-body p-4">
+    <form method="POST" novalidate>
+      {{ form.hidden_tag() }}
+      <div class="row g-3">
+        <div class="col-md-6">
+          {{ form.registration.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.registration(class="form-control" + (" is-invalid" if form.registration.errors else ""), placeholder="e.g. AP-BHV") }}
+          {% for error in form.registration.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          {{ form.aircraft_type.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.aircraft_type(class="form-control" + (" is-invalid" if form.aircraft_type.errors else ""), placeholder="e.g. Boeing 777-300ER") }}
+          {% for error in form.aircraft_type.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          {{ form.airline_id.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.airline_id(class="form-select" + (" is-invalid" if form.airline_id.errors else "")) }}
+          {% for error in form.airline_id.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          {{ form.category.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.category(class="form-select" + (" is-invalid" if form.category.errors else "")) }}
+          {% for error in form.category.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6 d-flex align-items-center">
+          <div class="form-check mt-4">
+            {{ form.is_active(class="form-check-input") }}
+            {{ form.is_active.label(class="form-check-label") }}
+          </div>
+        </div>
+      </div>
+
+      <hr class="my-4">
+      <div class="d-flex gap-2">
+        {{ form.submit(class="btn btn-pia-primary px-4") }}
+        <a href="{{ url_for('admin_aircraft.list_aircraft') }}" class="btn btn-light border">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

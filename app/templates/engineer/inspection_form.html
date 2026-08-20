@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New Inspection Form' if mode == 'create' else 'Edit Inspection Form' }}{% endblock %}
+{% block header_title %}{{ 'Engineer Inspection Form' if mode == 'create' else 'Edit Inspection Form #' + inspection.id|string }}{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="card-header-pia">
+    <h6><i class="bi bi-clipboard2-pulse me-2"></i>Engineer Inspection Form</h6>
+  </div>
+  <div class="card-body">
+    <form method="POST" novalidate id="inspectionForm">
+      {{ form.hidden_tag() }}
+
+      <h6 class="text-pia-green mb-3"><i class="bi bi-info-circle me-1"></i>General</h6>
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          {{ form.inspection_date.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.inspection_date(class="form-control" + (" is-invalid" if form.inspection_date.errors else "")) }}
+          {% for e in form.inspection_date.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Station</label>
+          <input type="text" class="form-control" value="Lahore" disabled>
+          {{ form.station_id(style="display:none;") }}
+          <div class="form-text">Station is fixed to Lahore for inspection forms.</div>
+        </div>
+        <div class="col-md-3">
+          {{ form.shift_id.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.shift_id(class="form-select" + (" is-invalid" if form.shift_id.errors else "")) }}
+          {% for e in form.shift_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        {% if current_user.is_super_admin %}
+        <div class="col-md-3">
+          {{ form.primary_engineer_id.label(class="form-label") }}
+          {{ form.primary_engineer_id(class="form-select", id="primaryEngineer") }}
+          <div class="form-text">Defaults to you if left unselected.</div>
+        </div>
+        {% else %}
+        {{ form.primary_engineer_id(style="display:none;", id="primaryEngineer") }}
+        {% endif %}
+        <div class="col-md-3">
+          {{ form.second_engineer_id.label(class="form-label") }}
+          {{ form.second_engineer_id(class="form-select", id="secondEngineer") }}
+          <div class="form-text">Optional. Splits credit 0.5 / 0.5 with the primary engineer.</div>
+        </div>
+      </div>
+
+      <h6 class="text-pia-green mb-3"><i class="bi bi-airplane me-1"></i>Aircraft</h6>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          {{ form.airline_id.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.airline_id(class="form-select" + (" is-invalid" if form.airline_id.errors else ""), id="airlineSelect") }}
+          {% for e in form.airline_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          {{ form.aircraft_id.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.aircraft_id(class="form-select" + (" is-invalid" if form.aircraft_id.errors else ""), id="aircraftSelect") }}
+          {% for e in form.aircraft_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+          <div class="form-text">Choose an airline first to filter registrations.</div>
+        </div>
+      </div>
+
+      <h6 class="text-pia-green mb-3"><i class="bi bi-ui-checks me-1"></i>Activity</h6>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          {{ form.activity_type.label(class="form-label") }} <span class="required-mark">*</span>
+          {{ form.activity_type(class="form-select" + (" is-invalid" if form.activity_type.errors else "")) }}
+          {% for e in form.activity_type.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+        </div>
+      </div>
+
+      <h6 class="text-pia-green mb-3"><i class="bi bi-chat-left-text me-1"></i>Remarks</h6>
+      <div class="row g-3 mb-4">
+        <div class="col-md-12">
+          {{ form.overall_remarks(class="form-control", rows="3", placeholder="Enter remarks...") }}
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end gap-2">
+        <a href="{{ url_for('engineer.list_inspections') }}" class="btn btn-light border">Cancel</a>
+        {{ form.submit(class="btn btn-pia-gold") }}
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var airlineSelect = document.getElementById("airlineSelect");
+  var aircraftSelect = document.getElementById("aircraftSelect");
+  var primaryEngineer = document.getElementById("primaryEngineer");
+  var secondEngineerSelect = document.getElementById("secondEngineer");
+  var currentAircraftId = "{{ form.aircraft_id.data or '' }}";
+
+  function loadAircraft(preserveSelection) {
+    if (!airlineSelect || !aircraftSelect) return;
+    var airlineId = airlineSelect.value;
+    var keep = preserveSelection ? aircraftSelect.value : "";
+    fetch("{{ url_for('engineer.inspection_aircraft_options') }}?airline_id=" + encodeURIComponent(airlineId || 0))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        aircraftSelect.innerHTML = "";
+        var placeholder = document.createElement("option");
+        placeholder.value = "0";
+        placeholder.textContent = "-- Select Aircraft --";
+        aircraftSelect.appendChild(placeholder);
+        data.forEach(function (a) {
+          var opt = document.createElement("option");
+          opt.value = a.id;
+          opt.textContent = a.registration + " (" + a.aircraft_type + ")";
+          aircraftSelect.appendChild(opt);
+        });
+        if (keep) { aircraftSelect.value = keep; }
+      })
+      .catch(function () { /* keep server-rendered options on failure */ });
+  }
+
+  if (airlineSelect) {
+    airlineSelect.addEventListener("change", function () { loadAircraft(false); });
+  }
+
+  // On first load of an edit page, keep the current aircraft selected once
+  // the airline-scoped options are fetched.
+  if (currentAircraftId) {
+    loadAircraft(true);
+  }
+
+  function excludePrimaryFromSecond() {
+    if (!primaryEngineer || !secondEngineerSelect) return;
+    var primaryVal = primaryEngineer.value;
+    Array.prototype.forEach.call(secondEngineerSelect.options, function (opt) {
+      opt.disabled = (opt.value !== "0" && opt.value === primaryVal);
+      if (opt.disabled && opt.selected) { secondEngineerSelect.value = "0"; }
+    });
+  }
+
+  if (primaryEngineer) {
+    primaryEngineer.addEventListener("change", excludePrimaryFromSecond);
+    excludePrimaryFromSecond();
+  }
+})();
+</script>
+
+{% endblock %}

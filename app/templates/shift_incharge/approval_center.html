@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Approval Center{% endblock %}
+{% block header_title %}Approval Center{% endblock %}
+{% block content %}
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{{ url_for('shift_incharge.approval_center', tab='pending') }}" class="btn btn-sm {{ 'btn-pia-primary' if tab == 'pending' else 'btn-light border' }}">
+    Pending <span class="badge badge-pending ms-1">{{ counts.pending }}</span>
+  </a>
+  <a href="{{ url_for('shift_incharge.approval_center', tab='approved') }}" class="btn btn-sm {{ 'btn-pia-primary' if tab == 'approved' else 'btn-light border' }}">
+    Approved <span class="badge badge-approved ms-1">{{ counts.approved }}</span>
+  </a>
+  <a href="{{ url_for('shift_incharge.approval_center', tab='rejected') }}" class="btn btn-sm {{ 'btn-pia-primary' if tab == 'rejected' else 'btn-light border' }}">
+    Rejected <span class="badge badge-rejected ms-1">{{ counts.rejected }}</span>
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-header-pia">
+    <h6>
+      <i class="bi {{ 'bi-hourglass-split' if tab == 'pending' else ('bi-check-circle' if tab == 'approved' else 'bi-x-circle') }} me-2"></i>
+      {{ tab | capitalize }} Activities
+    </h6>
+    <span class="badge badge-role">{{ pagination.total }} record{{ 's' if pagination.total != 1 }}</span>
+  </div>
+  <div class="card-body p-0">
+    {% if activities %}
+    <div class="table-responsive">
+      <table class="table table-pia mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Date</th>
+            <th>Shift</th>
+            <th>Station</th>
+            <th>Aircraft</th>
+            <th>Airline</th>
+            <th>Activity Type</th>
+            <th>Details</th>
+            <th>Submitted At</th>
+            <th>Status</th>
+            <th>Remarks</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in activities %}
+          <tr>
+            <td class="small">{{ a.logged_by.full_name if a.logged_by else '-' }}</td>
+            <td class="small">{{ a.activity_date | date_fmt }}</td>
+            <td class="small">{{ a.shift.name.label if a.shift else '-' }}</td>
+            <td class="small">{{ a.station.code if a.station else '-' }}</td>
+            <td class="small">{{ a.aircraft.registration if a.aircraft else '-' }}</td>
+            <td class="small">{{ a.aircraft.airline.name if a.aircraft and a.aircraft.airline else '-' }}</td>
+            <td class="small">{{ a.activity_type | enum_label }}</td>
+            <td class="small" style="max-width: 220px;">{{ a.detail_summary }}</td>
+            <td class="small">{{ a.created_at | dt }}</td>
+            <td><span class="badge {{ a.approval_status | badge_class }}">{{ a.approval_status | enum_label }}</span></td>
+            <td class="small" style="max-width: 180px;">{{ a.approval_remarks or '-' }}</td>
+            <td class="text-end text-nowrap">
+              <a href="{{ url_for('shift_incharge.review_activity', activity_id=a.id) }}" class="btn btn-sm btn-outline-pia"><i class="bi bi-eye"></i></a>
+              {% if tab == 'pending' %}
+              <button type="button" class="btn btn-sm btn-pia-primary" data-bs-toggle="modal" data-bs-target="#approveModal{{ a.id }}"><i class="bi bi-check-lg"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ a.id }}"><i class="bi bi-x-lg"></i></button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <div class="pagination-wrap p-3">
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+            <a class="page-link" href="{{ url_for('shift_incharge.approval_center', tab=tab, page=pagination.prev_num) }}">Previous</a>
+          </li>
+          {% for p in pagination.iter_pages() %}
+            {% if p %}
+              <li class="page-item {{ 'active' if p == pagination.page }}">
+                <a class="page-link" href="{{ url_for('shift_incharge.approval_center', tab=tab, page=p) }}">{{ p }}</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+          {% endfor %}
+          <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+            <a class="page-link" href="{{ url_for('shift_incharge.approval_center', tab=tab, page=pagination.next_num) }}">Next</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
+    {% else %}
+      {% set icon = 'bi-check2-square' %}
+      {% set title = 'No ' + tab + ' activities.' %}
+      {% set subtitle = 'Records will appear here as engineers submit activities for your shift.' %}
+      {% include "partials/empty_state.html" with context %}
+    {% endif %}
+  </div>
+</div>
+
+{% if tab == 'pending' %}
+{% for a in activities %}
+<div class="modal fade" id="approveModal{{ a.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('shift_incharge.approve_activity', activity_id=a.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-check-circle text-success me-2"></i>Approve Activity #{{ a.id }}</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">{{ a.activity_type | enum_label }} logged by {{ a.logged_by.full_name if a.logged_by else '-' }} on {{ a.activity_date | date_fmt }}.</p>
+          <label class="form-label small">Approval Remarks <span class="text-muted">(optional)</span></label>
+          <textarea name="remarks" class="form-control" rows="3" placeholder="Optional remarks..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-pia-primary"><i class="bi bi-check-lg me-1"></i>Approve</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="rejectModal{{ a.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="POST" action="{{ url_for('shift_incharge.reject_activity', activity_id=a.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-x-circle text-danger me-2"></i>Reject Activity #{{ a.id }}</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-2">{{ a.activity_type | enum_label }} logged by {{ a.logged_by.full_name if a.logged_by else '-' }} on {{ a.activity_date | date_fmt }}.</p>
+          <label class="form-label small">Rejection Remarks <span class="required-mark">*</span></label>
+          <textarea name="remarks" class="form-control" rows="3" placeholder="Explain why this activity is being rejected..." required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-lg me-1"></i>Reject</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% endblock %}
